@@ -1,5 +1,5 @@
 import socket
-import ssl
+import ssl # Secure Sockets Layer
 import sys
 
 class URL:
@@ -7,7 +7,7 @@ class URL:
         try:
             # example url: http://example.org/index.html
             self.schema, url = url.split("://", 1) # seperate schema from rest of the url, split(s, n) -> splits a string at the first n copies of s.
-            assert self.schema in ["http", "https"] # our browser supports these only
+            assert self.schema in ["http", "https"] # our browser supports these only; HTTPS: HTTP + TLS(Transport Layer Security)
 
             # seperate host from path
             if "/" not in url:
@@ -49,10 +49,10 @@ class URL:
         s.connect((self.host, self.port)) # talks to `example.org`
 
 
-        # wraps a raw socket with SSL to enable a secure HTTPS connection if the URL schema is https.
+        # create a default context and wrap the socket with it
         if self.schema == "https":
             ctx = ssl.create_default_context()
-            s = ctx.wrap_socket(s, server_hostname=self.host)
+            s = ctx.wrap_socket(s, server_hostname=self.host) # server_hostname used to check that we have connected to the right server. It should match the Host header
 
 
         # step-2: make a request to the other server
