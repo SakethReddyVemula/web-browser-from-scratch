@@ -2,6 +2,7 @@ import socket
 import ssl # Secure Sockets Layer
 import sys
 import urllib.parse
+import gzip # compression
 
 class URL:
     def __init__(self, url):
@@ -109,7 +110,8 @@ class URL:
         headers = {
             "Host": self.host,
             "Connection": "close",
-            "User-Agent": "MySimpleBrowser/1.0"
+            "User-Agent": "MySimpleBrowser/1.0",
+            "Accept-Encoding": "gzip" # inform the server that compressed data is acceptable
         }
 
         # use \r\n instead of \n for newlines !!!
@@ -124,13 +126,13 @@ class URL:
 
         # step-3: read server's response
         # read and while loop (or) python's makefile shortcut
-        response = s.makefile("r", encoding="utf8", newline="\r\n")
+        response = s.makefile("rb")
 
         # split the responses into pieces
         '''
             HTTP/1.0 200 OK
         '''
-        statusline = response.readline()
+        statusline = self._read_line(response).decode("utf8")
         version, status, explanation = statusline.split(" ", 2)
         
         '''
@@ -148,11 +150,12 @@ class URL:
             X-Cache: HIT
             Content-Length: 1270
             Connection: close
+            Content-Encoding: gzip
         '''
         # Headers
         response_headers = {}
         while True:
-            line = response.readline()
+            line = self._read_line(response).decode("utf8")
             if line == "\r\n":
                 break
             header, value = line.split(":", 1)
@@ -165,11 +168,92 @@ class URL:
         # assert "accept-encoding" not in response_headers # with content-encoding, to list the compression algorithm
 
         # everything after header, is sent (recieved) data
-        content = response.read()
+        content = self._read_body(response, response_headers)
         s.close()
 
         return content # body that we will display
+    
+    def _read_line(self, response):
+        """
+            Read a single file from binary response, including CRLF
+        """
+        line = b""
+        while True:
+            char = response.read(1)
+            if not char:
+                break
+            line += char
+            if line.endswith(b"\r\n"):
+                break
+        return line
+    
+    
+    def _read_body(self, response, headers):
+        """Read and decode the response body based on transfers and content encoding"""
+        # check for chunked transfer encoding
+        if headers.get("transfer-encoding", "").lower() == "chunked":
+            body = self._read_chunked_body(response)
+        else:
+            # Read based on content length or until connection closes
+            if "content-length" in headers:
+                content_length = int(headers["content-length"])
+                body = response.read(content_length)
+            else:
+                body = response.read()
 
+        # Handle content encoding (compression)
+        content_encoding = headers.get("content-encoding", "").lower()
+        if content_encoding == "gzip":
+            try:
+                body = gzip.decompress(body)
+            except Exception as e:
+                print(f"Error decompression gzip content: {e}")
+                pass
+        
+        # convert to string
+        try:
+            return body.decode("utf8")
+        except UnicodeDecodeError:
+            # fallback to latin-1 if utf8 fails
+            return body.decode("latin-1")
+        
+    def _read_chunked_body(self, response):
+        """Read chunked transfer encoding body"""
+        body = b""
+        while True:
+            # Read chunk size line
+            chunk_size_line = self._read_line(response)
+            chunk_size_str = chunk_size_line.decode("utf8").strip()
+            
+            # Parse chunk size (hex format, may have extensions after semicolon)
+            if ";" in chunk_size_str:
+                chunk_size_str = chunk_size_str.split(";")[0]
+            
+            try:
+                chunk_size = int(chunk_size_str, 16)
+            except ValueError:
+                print(f"Invalid chunk size: {chunk_size_str}")
+                break
+            
+            # If chunk size is 0, we've reached the end
+            if chunk_size == 0:
+                # Read trailing headers (if any) until empty line
+                while True:
+                    line = self._read_line(response)
+                    if line == b"\r\n":
+                        break
+                break
+            
+            # Read the chunk data
+            chunk_data = response.read(chunk_size)
+            body += chunk_data
+            
+            # Read the trailing CRLF after chunk data
+            trailing_crlf = response.read(2)
+            if trailing_crlf != b"\r\n":
+                print("Warning: Expected CRLF after chunk data")
+        
+        return body
 
 
 def show(body):
