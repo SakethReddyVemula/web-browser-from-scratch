@@ -9,4 +9,12 @@ Simple yet complete Web Browser in Python from Scratch
 - Prints the text (and not the tags) in the body.
 - Supports file URLs, to read the file when schema is `file` instead of setting up socket and sending request to remote server.
 - Supports `data:` schema, allows embedding content directly in the URL (like `data:text/html,Hello World!`)
-- Support the following additional features: HTTP/1.1, File, data, Entities, view-source. To-Do: Keep-alive, Redirects, Caching, Compression.
+- Support the following additional features: HTTP/1.1, File, data, Entities, view-source, compression. To-Do: Keep-alive, Redirects, Caching.
+
+
+### Lab-2 Drawing the Screen
+- creating windows using `tkinter`
+- Drawing the window with defined `WIDTH` and `HEIGHT`
+- Laying out text using `HSTEP` and `VSTEP`
+- Supporting scrolling of text with layout
+- Fast rendering of page contents so that the user "Feel Fluid".
