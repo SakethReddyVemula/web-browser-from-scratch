@@ -27,6 +27,11 @@ class Layout:
         self.size = 16
 
         self.line = [] # to store line-to-be
+
+        # alignment tracking
+        self.align = "left" # can be "left", "center", or "right"
+        self.in_title_h1 = False # track if we are insider <h1 class="title">
+
     
         for tok in tokens:
             self.token(tok)
@@ -39,7 +44,20 @@ class Layout:
             for word in tok.text.split():
                 self.word(word)
         elif isinstance(tok, Tag):
-            if tok.tag == "i":
+            if tok.tag == "h1":
+                # check if this h1 has class="title"
+                if tok.attributes.get("class") == "title":
+                    self.in_title_h1 = True
+                    self.align = "center"
+                    self.flush() # start fresh line for h1
+            elif tok.tag == "/h1":
+                if self.in_title_h1 == True:
+                    self.flush() # finish current line
+                    self.in_title_h1 = False 
+                    self.align = "left" # reset to left alignment
+                    self.cursor_y += VSTEP # add some spacing after h1
+
+            elif tok.tag == "i":
                 self.style = "italic"
             elif tok.tag == "/i":
                 self.style = "roman"
@@ -78,13 +96,33 @@ class Layout:
         
         metrics = [font.metrics() for x, word, font in self.line]
         max_ascent = max([metric["ascent"] for metric in metrics])
-
         baseline = self.cursor_y + 1.25 * max_ascent
 
-        # now place each word relative to that line and add it to the display list
-        for x, word, font in self.line:
-            y = baseline - font.metrics("ascent")
-            self.display_list.append((x, y, word, font))
+        # calculate line width for centering
+        if self.align == "center":
+            # calculate total width of the line
+            line_width = 0
+            if self.line:
+                first_x = self.line[0][0]
+                last_x, last_word, last_font = self.line[-1]
+                last_word_width = last_font.measure(last_word)
+                line_width = (last_x + last_word_width) - first_x
+
+            # calculate offset to center the line
+            available_width = WIDTH - 2 * HSTEP
+            center_offset = (available_width - line_width) // 2
+
+            # adjust x positions for centering
+            for i, (x, word, font) in enumerate(self.line):
+                centered_x = center_offset + HSTEP + (x - HSTEP)
+                y = baseline - font.metrics()["ascent"]
+                self.display_list.append((centered_x, y, word, font))
+        
+        else:
+            # now place each word relative to that line and add it to the display list
+            for x, word, font in self.line:
+                y = baseline - font.metrics("ascent")
+                self.display_list.append((x, y, word, font))
         
         max_descent = max([metric["descent"] for metric in metrics])
         self.cursor_y = baseline + 1.25 * max_descent
