@@ -22,3 +22,7 @@ Components of a Typical Browser:
 - Laying out text using `HSTEP` and `VSTEP`
 - Supporting scrolling of text with layout
 - Fast rendering of page contents so that the user "Feel Fluid".
+
+
+## Assumptions
+- The browser doesn't support whitespace-only text nodes. Real browser retain such whitespaces to correctly render make<span> </span>up as two. This browser won't. Ignoring whitespaces simplifies complexities, by avoiding a special case for whitespaces only text tags.
