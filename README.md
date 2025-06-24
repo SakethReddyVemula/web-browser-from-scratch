@@ -1,6 +1,10 @@
 # web-browser-from-scratch
 Simple yet complete Web Browser in Python from Scratch
 
+Components of a Typical Browser:
+
+![Browser_Image](browser-components.png)
+
 ### Lab-1 Specifications (Browser acts like a command line tool)
 - Parses the URL into a schema, host, port and path.
 - Connects to that host using the `socket` and `ssl` library.
