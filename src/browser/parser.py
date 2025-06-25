@@ -28,6 +28,10 @@ class HTMLParser:
             "area", "base", "br", "col", "embed", "hr", "img", "input",
             "link", "meta", "param", "source", "track", "wbr",
         ]
+        self.HEAD_TAGS = [
+            "base", "basefont", "bgsound", "noscript",
+            "link", "meta", "title", "style", "script",
+        ]
 
 
     def parse(self):
@@ -56,6 +60,7 @@ class HTMLParser:
         # add a text node as child of the last unfinished node
         if text.isspace():
             return # skip all whitespaces-only text nodes such as "\n" after docstring. Otherwise leads to complexity in our simple browser
+        self.implicit_tags(None)
         parent = self.unfinished[-1]
         node = Text(text, parent)
         parent.children.append(node)
@@ -67,6 +72,7 @@ class HTMLParser:
         if tag.startswith('!'):
             return # ignore the "!DOCTYPE html" as it doesn't make any difference to our simple, cute browser
             # this also throws out comments :))
+        self.implicit_tags(tag)
         if tag.startswith('/'):
             # pop from unfinished, and add the popped node as the child of the unifinished[-1]
             if len(self.unfinished) == 1: # handle last node
@@ -86,6 +92,8 @@ class HTMLParser:
 
     def finish(self):
         """Completes the Incomplete Tree to final, complete tree"""
+        if not self.unfinished:
+            self.implicit_tags(None)
         while len(self.unfinished) > 1:
             node = self.unfinished.pop()
             parent = self.unfinished[-1]
@@ -108,6 +116,22 @@ class HTMLParser:
                 attributes[attr_pair.casefold()] = ""
 
         return tag, attributes  
+    
+    def implicit_tags(self, tag):
+        while True:
+            open_tags = [node.tag for node in self.unfinished]
+            
+            if open_tags == [] and tag != "html":
+                self.add_tag("html")
+            elif open_tags == ["html"] and tag not in ["head", "body", "/html"]:
+                if tag in self.HEAD_TAGS:
+                    self.add_tag("head")
+                else:
+                    self.add_tag("body")
+            elif open_tags == ["html", "head"] and tag not in ["/head"] + self.HEAD_TAGS:
+                self.add_tag("/head")
+            else:
+                break # exit out of the loop
     
 
 def print_tree(node, indent=0):
