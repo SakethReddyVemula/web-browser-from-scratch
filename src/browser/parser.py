@@ -101,14 +101,11 @@ class HTMLParser:
         for attr_pair in parts[1:]:
             if "=" in attr_pair:
                 key, value = attr_pair.split("=", 1)
-                attributes[key.casefold()] = value
                 if len(value) > 2 and value[0] in ["'", "\""]:
-                    value = value[1:-1]
+                    value = value[1:-1]  # Remove quotes first
+                attributes[key.casefold()] = value  # Then store the unquoted version
             else:
                 attributes[attr_pair.casefold()] = ""
-            
-            
-
 
         return tag, attributes  
     

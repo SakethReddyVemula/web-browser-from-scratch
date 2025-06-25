@@ -1,8 +1,10 @@
 # Main browser GUI and rendering
 import tkinter
 from constants import WIDTH, HEIGHT, VSTEP, SCROLL_STEP
-from layout import Layout
-from lexer import lex
+# from layout import Layout
+from layout_tree import Layout # Use tree based layout instead of normal lexer based
+# from lexer import lex
+from parser import HTMLParser
 
 class Browser:
     def __init__(self):
@@ -23,15 +25,20 @@ class Browser:
 
     # load and draw the text, character by character
     def load(self, url):
+        # body = url.request()
+        # text = []
+        # if url.schema == "view-source":
+        #     # for view-source, print the HTML as plain text (no tag filtering)
+        #     text = body
+        # else:
+        #     # other than view-source schema
+        #     text = lex(body)
+        # self.display_list = Layout(text).display_list
+        # self.draw()
+
         body = url.request()
-        text = []
-        if url.schema == "view-source":
-            # for view-source, print the HTML as plain text (no tag filtering)
-            text = body
-        else:
-            # other than view-source schema
-            text = lex(body)
-        self.display_list = Layout(text).display_list
+        self.nodes = HTMLParser(body).parse()
+        self.display_list = Layout(self.nodes).display_list
         self.draw()
     
     def draw(self):
