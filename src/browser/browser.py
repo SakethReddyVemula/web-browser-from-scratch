@@ -2,9 +2,20 @@
 import tkinter
 from constants import WIDTH, HEIGHT, VSTEP, SCROLL_STEP
 # from layout import Layout
-from layout_tree import Layout # Use tree based layout instead of normal lexer based
+# from layout_tree import Layout # Use tree based layout instead of normal lexer based
+from layout_tree_new import DocumentLayout # Use tree based layout instead of normal lexer based
 # from lexer import lex
-from parser import HTMLParser
+from parser import HTMLParser, print_tree
+
+
+
+def paint_tree(layout_object, display_list):
+    """Helper function to recursively call paint() on all layout objects"""
+    display_list.extend(layout_object.paint())
+
+    for child in layout_object.children:
+        paint_tree(child, display_list)
+
 
 class Browser:
     def __init__(self):
@@ -38,8 +49,15 @@ class Browser:
 
         body = url.request()
         self.nodes = HTMLParser(body).parse()
-        self.display_list = Layout(self.nodes).display_list
+        # self.display_list = Layout(self.nodes).display_list
+        # self.draw()
+        self.document = DocumentLayout(self.nodes) # constructing layout objects
+        self.document.layout() # actually laying out "layout objects" earlier constructed
+        # print_tree(self.document.node)
+        self.display_list = []
+        paint_tree(self.document, self.display_list)
         self.draw()
+
     
     def draw(self):
         self.canvas.delete("all") # delete the old text before drawing new one, o/w it will lead to blackboxes eventually
