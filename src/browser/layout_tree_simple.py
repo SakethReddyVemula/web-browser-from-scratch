@@ -1,7 +1,7 @@
 # Layout and font management
 import tkinter
 import tkinter.font
-from constants import WIDTH, HEIGHT, HSTEP, VSTEP, BLOCK_ELEMENTS
+from constants import WIDTH, HEIGHT, HSTEP, VSTEP
 from parser import Text, Element
 
 FONTS = {}
@@ -17,125 +17,29 @@ def get_font(size, weight, style):
     return FONTS[key][0]
 
 
-class DocumentLayout:
-    def __init__(self, node):
-        self.node = node
-        self.parent = None
-        self.children = []
-
-        self.x = None
-        self.y = None
-        self.width = None
-        self.height = None 
-
-    def layout(self):
-        child = BlockLayout(self.node, self, None)
-        self.children.append(child)
-
-        self.width = WIDTH - 2 * HSTEP
-        self.x = HSTEP
-        self.y = VSTEP 
-
-        child.layout() # recursive call to layout
-
-        self.height = child.height
-
-    def paint(self):
-        return []
-
-
-class BlockLayout:
-    def __init__(self, node, parent, previous):
-        self.node = node
-        self.parent = parent
-        self.previous = previous
-        self.children = []
-
-        # computing size and position of each BlockLayout separately
-        self.x = None
-        self.y = None
-        self.width = None
-        self.height = None
-
+class Layout:
+    def __init__(self, tree):
         self.display_list = []
+        self.cursor_x = HSTEP
+        self.cursor_y = VSTEP
+        self.weight = "normal"
+        self.style = "roman"
+        self.size = 16
 
-    def layout_intermediate(self):
-        # this code constructs the layout tree from the HTML tree, so it reads from node.children (in the HTML tree) and writes to self.children (in the layout tree)
-        previous = None
-        # self.node is to HTML Tree
-        # self, previous, next are corresponding to Layout Tree
-        for child in self.node.children: 
-            next = BlockLayout(child, self, previous)
-            self.children.append(next)
-            previous = next
+        self.line = [] # to store line-to-be
 
-    def layout_mode(self):
-        """Determine which way to lay out text, inline/blocks"""
-        if isinstance(self.node, Text):
-            return "inline"
-        elif any([isinstance(child, Element) and child.tag in BLOCK_ELEMENTS for child in self.node.children]):
-            return "block"
-        elif self.node.children:
-            return "inline"
-        else:
-            return "block"
-        
-    def layout(self):
+        # alignment tracking
+        self.align = "left" # can be "left", "center", or "right"
+        self.in_title_h1 = False # track if we are inside <h1 class="title">
 
-        # computing size and position of each BlockLayout separately
+        # superscript tracking
+        self.superscript = False # track if we are inside <sup> superscript mode
 
-        # x position must be computed before the recursive layout call of childrens
-        self.x = self.parent.x
-        self.width = self.parent.width
-        if self.previous: # if there is a previous sibling, then start right after it
-            self.y = self.previous.y + self.previous.height
-        else: # otherwise, start at its parent's top edge
-            self.y = self.parent.y
+        # Process the tree recursively
+        self.recurse(tree)
+        self.flush()
 
         
-        mode = self.layout_mode()
-
-        if mode == "block":
-            previous = None
-            for child in self.node.children:
-                next = BlockLayout(child, self, previous)
-                self.children.append(next)
-                previous = next
-        else: # mode == "inline"
-            self.cursor_x = 0 # not HSTEP/VSTEP, since we are not relative to the block's x, y
-            self.cursor_y = 0
-            self.weight = "normal"
-            self.style = "roman"
-            self.size = 12
-
-            self.line = [] # to store line-to-be
-
-            # alignment tracking
-            self.align = "left" # can be "left", "center", or "right"
-            self.in_title_h1 = False # track if we are inside <h1 class="title">
-
-            # superscript tracking
-            self.superscript = False # track if we are inside <sup> superscript mode
-
-            # Process the tree recursively
-            self.recurse(self.node)
-            self.flush()
-
-        
-        for child in self.children:
-            child.layout()
-
-
-        # element's height field depends on the children's height, so must be computed after the layout call of childrens
-        if mode == "block":
-            self.height = sum([child.height for child in self.children])
-        else:
-            self.height = self.cursor_y # if it is normal text, all the text must be insider, right...
-
-
-        
-
-
     def recurse(self, tree):
         """Recursively process the tree structure"""
         if isinstance(tree, Text):
@@ -152,7 +56,6 @@ class BlockLayout:
             
             # Process closing tag
             self.close_tag(tree.tag)
-
 
     def open_tag(self, tag, attributes):
         """Handle opening HTML tags"""
@@ -206,13 +109,12 @@ class BlockLayout:
         font = get_font(curr_size, self.weight, self.style)
         
         w = font.measure(word) # width taken by that word
-        if self.cursor_x + w > self.width:
+        if self.cursor_x + w > WIDTH - HSTEP:
             self.flush()
 
         # store superscript flag with each word for positioning
         self.line.append((self.cursor_x, word, font, self.superscript))
         self.cursor_x += w + font.measure(" ")
-
 
     def flush(self):
         if not self.line:
@@ -222,7 +124,7 @@ class BlockLayout:
         normal_metrics = []
         super_metrics = []
 
-        for rel_x, word, font, is_superscript in self.line:
+        for x, word, font, is_superscript in self.line:
             metrics = font.metrics()
             if is_superscript:
                 super_metrics.append(metrics)
@@ -243,27 +145,25 @@ class BlockLayout:
             # calculate total width of the line
             line_width = 0
             if self.line:
-                first_rel_x = self.line[0][0]
-                last_rel_x, last_word, last_font, _ = self.line[-1]
+                first_x = self.line[0][0]
+                last_x, last_word, last_font, _ = self.line[-1]
                 last_word_width = last_font.measure(last_word)
-                line_width = (last_rel_x + last_word_width) - first_rel_x
+                line_width = (last_x + last_word_width) - first_x
 
             # calculate offset to center the line
             available_width = WIDTH - 2 * HSTEP
             center_offset = (available_width - line_width) // 2
 
             # adjust x positions for centering
-            for i, (rel_x, word, font, is_superscript) in enumerate(self.line):
-                centered_rel_x = center_offset + HSTEP + (rel_x - HSTEP)
-                centered_abs_x = self.x + centered_rel_x
-                abs_y = self.y + self._calculate_word_y(baseline, font, is_superscript, normal_metrics)
-                self.display_list.append((centered_abs_x, abs_y, word, font))
+            for i, (x, word, font, is_superscript) in enumerate(self.line):
+                centered_x = center_offset + HSTEP + (x - HSTEP)
+                y = self._calculate_word_y(baseline, font, is_superscript, normal_metrics)
+                self.display_list.append((centered_x, y, word, font))
         else:
             # now place each word relative to that line and add it to the display list
-            for rel_x, word, font, is_superscript in self.line:
-                abs_x = self.x + rel_x
-                abs_y = self.y + self._calculate_word_y(baseline, font, is_superscript, normal_metrics)
-                self.display_list.append((abs_x, abs_y, word, font))
+            for x, word, font, is_superscript in self.line:
+                y = self._calculate_word_y(baseline, font, is_superscript, normal_metrics)
+                self.display_list.append((x, y, word, font))
         
         all_metrics = normal_metrics + super_metrics
         if all_metrics:
@@ -273,13 +173,11 @@ class BlockLayout:
             self.cursor_y += VSTEP
 
         # update Layout's cursor_x and self.line
-        self.cursor_x = 0 # 0 instead of HSTEP, since relative to the block's x and y
+        self.cursor_x = HSTEP
         self.line = []
 
-
-
     def _calculate_word_y(self, baseline, font, is_super, normal_metrics):
-        """Calculate relative y position for a word, handling superscript positioning"""
+        """Calculate y position for a word, handling superscript positioning"""
         if is_super and normal_metrics:
             # Superscript: align top of superscript with top of normal letters
             normal_ascent = max([metric["ascent"] for metric in normal_metrics])
@@ -292,7 +190,3 @@ class BlockLayout:
         else:
             # Normal text positioning
             return baseline - font.metrics()["ascent"]
-        
-
-    def paint(self):
-        return self.display_list

@@ -2,8 +2,8 @@
 import tkinter
 from constants import WIDTH, HEIGHT, VSTEP, SCROLL_STEP
 # from layout import Layout
-# from layout_tree import Layout # Use tree based layout instead of normal lexer based
-from layout_tree_new import DocumentLayout # Use tree based layout instead of normal lexer based
+# from layout_tree_simple import Layout # Use tree based layout instead of normal lexer based
+from layout_tree import DocumentLayout # Use tree based layout instead of normal lexer based
 # from lexer import lex
 from parser import HTMLParser, print_tree
 
