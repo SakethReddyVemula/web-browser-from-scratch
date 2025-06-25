@@ -11,7 +11,7 @@ from parser import HTMLParser, print_tree
 
 def paint_tree(layout_object, display_list):
     """Helper function to recursively call paint() on all layout objects"""
-    display_list.extend(layout_object.paint())
+    display_list.extend(layout_object.paint()) # call paint before calling paint_tree recursively -> subtree paints on top of curr_node
 
     for child in layout_object.children:
         paint_tree(child, display_list)
@@ -61,18 +61,28 @@ class Browser:
     
     def draw(self):
         self.canvas.delete("all") # delete the old text before drawing new one, o/w it will lead to blackboxes eventually
-        for x, y, c, font in self.display_list:
+        # for x, y, c, font in self.display_list:
 
-            # for fast rendering: skip drawing characters that are offscreen
-            if y > self.scroll + HEIGHT: continue
-            if y + VSTEP < self.scroll: continue
+        #     # for fast rendering: skip drawing characters that are offscreen
+        #     if y > self.scroll + HEIGHT: continue
+        #     if y + VSTEP < self.scroll: continue
 
-            self.canvas.create_text(x, y - self.scroll, text=c, anchor="nw", font=font) # anchor = "nw" -> tells tkinter that the coordinates are the top-left (northwest), and not the center as assumed in default
+        #     self.canvas.create_text(x, y - self.scroll, text=c, anchor="nw", font=font) # anchor = "nw" -> tells tkinter that the coordinates are the top-left (northwest), and not the center as assumed in default
+        for cmnd in self.display_list:
+            if cmnd.top > self.scroll + HEIGHT:
+                continue
+            if cmnd.bottom < self.scroll:
+                continue
+            cmnd.execute(self.scroll, self.canvas)
+
+
 
     def scrolldown(self, e):
-        self.scroll += SCROLL_STEP
+        max_y = max(self.document.height + 2*VSTEP - HEIGHT, 0)
+        self.scroll = min(self.scroll + SCROLL_STEP, max_y)
         self.draw()
 
     def scrollup(self, e):
         self.scroll -= SCROLL_STEP
+        self.scroll = max((-1) * VSTEP, self.scroll - SCROLL_STEP)
         self.draw()
