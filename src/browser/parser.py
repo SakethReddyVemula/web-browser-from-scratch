@@ -101,21 +101,106 @@ class HTMLParser:
 
         return self.unfinished.pop()
     
+    # def get_attributes(self, text):
+    #     parts = text.split()
+    #     tag = parts[0].casefold()
+    #     attributes = {}
+
+    #     for attr_pair in parts[1:]:
+    #         if "=" in attr_pair:
+    #             key, value = attr_pair.split("=", 1)
+    #             if len(value) > 2 and value[0] in ["'", "\""]:
+    #                 value = value[1:-1]  # Remove quotes first
+    #             attributes[key.casefold()] = value  # Then store the unquoted version
+    #         else:
+    #             attributes[attr_pair.casefold()] = ""
+
+    #     return tag, attributes  
+
+
     def get_attributes(self, text):
-        parts = text.split()
-        tag = parts[0].casefold()
+        """Parse HTML tag attributes, properly handling quoted values with spaces"""
+        i = 0
+        
+        # Skip whitespace and get the tag name
+        while i < len(text) and text[i].isspace():
+            i += 1
+        
+        # Get tag name
+        tag_start = i
+        while i < len(text) and not text[i].isspace():
+            i += 1
+        tag = text[tag_start:i].casefold()
+        
+        # Skip whitespace after tag name
+        while i < len(text) and text[i].isspace():
+            i += 1
+        
         attributes = {}
-
-        for attr_pair in parts[1:]:
-            if "=" in attr_pair:
-                key, value = attr_pair.split("=", 1)
-                if len(value) > 2 and value[0] in ["'", "\""]:
-                    value = value[1:-1]  # Remove quotes first
-                attributes[key.casefold()] = value  # Then store the unquoted version
+        
+        # Parse attributes
+        while i < len(text):
+            # Skip whitespace
+            while i < len(text) and text[i].isspace():
+                i += 1
+            
+            if i >= len(text):
+                break
+            
+            # Get attribute name
+            attr_start = i
+            while i < len(text) and text[i] not in ['=', ' ', '\t', '\n', '\r']:
+                i += 1
+            
+            if i == attr_start:  # No attribute name found
+                break
+                
+            attr_name = text[attr_start:i].casefold()
+            
+            # Skip whitespace after attribute name
+            while i < len(text) and text[i].isspace():
+                i += 1
+            
+            # Check for equals sign
+            if i < len(text) and text[i] == '=':
+                i += 1  # Skip the '='
+                
+                # Skip whitespace after equals
+                while i < len(text) and text[i].isspace():
+                    i += 1
+                
+                if i < len(text):
+                    # Check if value is quoted
+                    if text[i] in ['"', "'"]:
+                        quote_char = text[i]
+                        i += 1  # Skip opening quote
+                        value_start = i
+                        
+                        # Find closing quote
+                        while i < len(text) and text[i] != quote_char:
+                            i += 1
+                        
+                        if i < len(text):  # Found closing quote
+                            value = text[value_start:i]
+                            i += 1  # Skip closing quote
+                        else:  # No closing quote found, take rest of string
+                            value = text[value_start:]
+                    else:
+                        # Unquoted value - read until whitespace
+                        value_start = i
+                        while i < len(text) and not text[i].isspace():
+                            i += 1
+                        value = text[value_start:i]
+                    
+                    attributes[attr_name] = value
+                else:
+                    # No value after equals
+                    attributes[attr_name] = ""
             else:
-                attributes[attr_pair.casefold()] = ""
-
-        return tag, attributes  
+                # Attribute without value (boolean attribute)
+                attributes[attr_name] = ""
+        
+        return tag, attributes
     
     def implicit_tags(self, tag):
         while True:
