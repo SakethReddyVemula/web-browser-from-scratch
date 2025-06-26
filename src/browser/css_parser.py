@@ -64,6 +64,7 @@ class CSSParser:
         return prop.casefold(), val
     
     def body(self):
+        """returns a list of pair of `property-value`"""
         pairs = {}
 
         while self.i < len(self.s) and self.s[self.i] != "}":
@@ -96,6 +97,7 @@ class CSSParser:
     # Selector related method
     
     def selector(self):
+        """returns an object of type `TagSelector` with descendants (if any)"""
         out = TagSelector(self.word().casefold())
         self.whitespace()
 
@@ -136,9 +138,19 @@ class CSSParser:
         return rules
     
 
-def style(node):
+def style(node, rules):
     # store CSS styles in node.style dictionary
     node.style = {}
+
+    # apply default rules (aka "user agent" style sheet. User agent, like the Memex)
+    for selector, body in rules:
+        if not selector.matches(node):
+            continue
+        for property, value in body.items():
+            node.style[property] = value
+
+
+    # overwrite the default style sheets
     if isinstance(node, Element) and "style" in node.attributes:
         pairs = CSSParser(node.attributes["style"]).body()
         for property, value in pairs.items():
@@ -146,7 +158,7 @@ def style(node):
     
     # recurse through the HTML tree, to set all the children's style also the same
     for child in node.children:
-        style(child)
+        style(child, rules)
 
 
 

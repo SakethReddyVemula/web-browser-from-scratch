@@ -6,7 +6,10 @@ from constants import WIDTH, HEIGHT, VSTEP, SCROLL_STEP
 from layout_tree import DocumentLayout # Use tree based layout instead of normal lexer based
 # from lexer import lex
 from parser import HTMLParser, print_tree
-from css_parser import style
+from css_parser import style, CSSParser
+
+# default user-agent style sheet
+DEFAULT_STYLE_SHEET = CSSParser(open("user_agent.css").read()).parse()
 
 
 def paint_tree(layout_object, display_list):
@@ -52,7 +55,9 @@ class Browser:
         # self.display_list = Layout(self.nodes).display_list
         # self.draw()
 
-        style(self.nodes)
+        # apply default (from user-agent) style sheets
+        rules = DEFAULT_STYLE_SHEET.copy()
+        style(self.nodes, rules)
 
         self.document = DocumentLayout(self.nodes) # constructing layout objects
         self.document.layout() # actually laying out "layout objects" earlier constructed
