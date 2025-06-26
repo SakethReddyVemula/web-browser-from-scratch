@@ -6,7 +6,7 @@ from constants import WIDTH, HEIGHT, VSTEP, SCROLL_STEP
 from layout_tree import DocumentLayout # Use tree based layout instead of normal lexer based
 # from lexer import lex
 from parser import HTMLParser, print_tree
-
+from css_parser import style
 
 
 def paint_tree(layout_object, display_list):
@@ -51,6 +51,9 @@ class Browser:
         self.nodes = HTMLParser(body).parse()
         # self.display_list = Layout(self.nodes).display_list
         # self.draw()
+
+        style(self.nodes)
+
         self.document = DocumentLayout(self.nodes) # constructing layout objects
         self.document.layout() # actually laying out "layout objects" earlier constructed
         # print_tree(self.document.node)

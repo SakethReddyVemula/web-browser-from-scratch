@@ -330,10 +330,17 @@ class BlockLayout:
         cmnds = [] # commands can be Text, Rectangle...
 
         # background has to be before Text (always)
-        if isinstance(self.node, Element) and self.node.tag == "pre":
+        bgcolor = self.node.style.get("background-color", "transparent")
+
+        if bgcolor != "transparent":
             x2, y2 = self.x + self.width, self.y + self.height
-            rect = DrawRect(self.x, self.y, x2, y2, "gray")
+            rect = DrawRect(self.x, self.y, x2, y2, bgcolor)
             cmnds.append(rect)
+
+        # if isinstance(self.node, Element) and self.node.tag == "pre":
+        #     x2, y2 = self.x + self.width, self.y + self.height
+        #     rect = DrawRect(self.x, self.y, x2, y2, "gray")
+        #     cmnds.append(rect)
 
         if self.layout_mode() == "inline":
             for x, y, word, font in self.display_list:

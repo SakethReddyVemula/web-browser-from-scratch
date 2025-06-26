@@ -4,7 +4,6 @@ import tkinter
 from url import URL
 from browser import Browser
 from utils import load
-from parser import HTMLParser, print_tree
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

@@ -1,5 +1,5 @@
 # All constants used across the application
-WIDTH, HEIGHT = 1200, 600
+WIDTH, HEIGHT = 1200, 1100
 HSTEP, VSTEP = 13, 18
 SCROLL_STEP = 100
 

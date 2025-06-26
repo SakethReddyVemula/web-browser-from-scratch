@@ -26,3 +26,4 @@ Components of a Typical Browser:
 
 ## Assumptions
 - The browser doesn't support whitespace-only text nodes. Real browser retain such whitespaces to correctly render make<span> </span>up as two. This browser won't. Ignoring whitespaces simplifies complexities, by avoiding a special case for whitespaces only text tags.
+- The browser doesn't support parenthesis in CSS property values. This inhibits us from parsing things like `calc` and `url` functions (are supported in real browsers).
