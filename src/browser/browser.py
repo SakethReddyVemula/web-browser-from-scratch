@@ -75,8 +75,8 @@ class Browser:
             except:        
                 continue
             rule = CSSParser(body).parse()
-            for property, value in rules:
-                print(f"{property} -> {value}")
+            # for property, value in rules:
+                # print(f"{property} -> {value}")
             rules.extend(rule)
 
         style(self.nodes, sorted(rules, key=cascade_priority)) # cascading, file-order acts as tie-breaker (as required) (python sorted works like that)

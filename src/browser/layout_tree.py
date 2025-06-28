@@ -198,14 +198,6 @@ class BlockLayout:
                 self.flush() # start fresh line for h1
         elif tag == "sup":
             self.superscript = True
-        elif tag == "i":
-            self.style = "italic"
-        elif tag == "b":
-            self.weight = "bold"
-        elif tag == "small":
-            self.size -= 2
-        elif tag == "big":
-            self.size += 4
         elif tag == "br":
             self.flush()
 
@@ -219,14 +211,6 @@ class BlockLayout:
                 self.cursor_y += VSTEP # add some spacing after h1
         elif tag == "sup":
             self.superscript = False
-        elif tag == "i":
-            self.style = "roman"
-        elif tag == "b":
-            self.weight = "normal"
-        elif tag == "small":
-            self.size += 2
-        elif tag == "big":
-            self.size -= 4
         elif tag == "p":
             self.flush()
             self.cursor_y += VSTEP
