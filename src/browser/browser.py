@@ -27,7 +27,8 @@ class Browser:
         self.canvas = tkinter.Canvas(
             self.window, 
             width=WIDTH,
-            height=HEIGHT
+            height=HEIGHT,
+            bg="white"
         )
         self.canvas.pack()
 
@@ -58,8 +59,7 @@ class Browser:
 
         # apply default (from user-agent) style sheets
         rules = DEFAULT_STYLE_SHEET.copy()
-        style(self.nodes, sorted(rules, key=cascade_priority)) # cascading, file-order acts as tie-breaker (as required) (python sorted works like that)
-        
+
         links = []
 
         # parsing <link rel="stylesheet" href="/main.css"> ...
@@ -68,13 +68,18 @@ class Browser:
                 links.append(node.attributes["href"])
 
         for link in links:
+            # print(f"css links: {link}")
             style_url = url.resolve(link)
             try:
                 body = style_url.request()
             except:        
                 continue
-            rules.extend(CSSParser(body).parse())
+            rule = CSSParser(body).parse()
+            for property, value in rules:
+                print(f"{property} -> {value}")
+            rules.extend(rule)
 
+        style(self.nodes, sorted(rules, key=cascade_priority)) # cascading, file-order acts as tie-breaker (as required) (python sorted works like that)
         
         self.document = DocumentLayout(self.nodes) # constructing layout objects
         self.document.layout() # actually laying out "layout objects" earlier constructed

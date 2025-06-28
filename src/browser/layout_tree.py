@@ -44,11 +44,12 @@ class DocumentLayout:
         return []
     
 class DrawText:
-    def __init__(self, x1, y1, text, font):
+    def __init__(self, x1, y1, text, font, color):
         self.top = y1
         self.left = x1
         self.text = text
         self.font = font
+        self.color = color
         self.bottom = y1 + font.metrics("linespace")
 
     def execute(self, scroll, canvas):
@@ -56,7 +57,8 @@ class DrawText:
             self.left, self.top - scroll,
             text = self.text,
             font = self.font,
-            anchor = "nw"
+            anchor = "nw",
+            fill = self.color
         )
 
 class DrawRect:
@@ -168,22 +170,22 @@ class BlockLayout:
         
 
 
-    def recurse(self, tree):
+    def recurse(self, node):
         """Recursively process the tree structure"""
-        if isinstance(tree, Text):
+        if isinstance(node, Text):
             # Process text node
-            for word in tree.text.split():
-                self.word(word)
-        elif isinstance(tree, Element):
+            for word in node.text.split():
+                self.word(node, word)
+        elif isinstance(node, Element):
             # Process element node - opening tag
-            self.open_tag(tree.tag, tree.attributes)
+            self.open_tag(node.tag, node.attributes)
             
             # Process all children
-            for child in tree.children:
+            for child in node.children:
                 self.recurse(child)
             
             # Process closing tag
-            self.close_tag(tree.tag)
+            self.close_tag(node.tag)
 
 
     def open_tag(self, tag, attributes):
@@ -229,20 +231,27 @@ class BlockLayout:
             self.flush()
             self.cursor_y += VSTEP
 
-    def word(self, word):
-        # calculate word size based on superscript state
-        curr_size = self.size
-        if self.superscript == True:
-            curr_size = max(8, int(self.size * 0.6)) # 60% of normal size, minimum 8px
+    def word(self, node, word):
+        weight = node.style["font-weight"]
+        style = node.style["font-style"]
+        # translate CSS's normal to tkinter "roman"
+        if style == "normal":
+            style = "roman"
+        curr_size = int(float(node.style["font-size"][:-2]) * 0.75) # convert CSS's pixels to Tkinter points
 
-        font = get_font(curr_size, self.weight, self.style)
+        # calculate word size based on superscript state
+        if self.superscript == True:
+            curr_size = max(8, int(curr_size * 0.6)) # 60% of normal size, minimum 8px
+
+        font = get_font(curr_size, weight, style)
         
         w = font.measure(word) # width taken by that word
         if self.cursor_x + w > self.width:
             self.flush()
 
         # store superscript flag with each word for positioning
-        self.line.append((self.cursor_x, word, font, self.superscript))
+        color = node.style["color"]
+        self.line.append((self.cursor_x, word, font, self.superscript, color))
         self.cursor_x += w + font.measure(" ")
 
 
@@ -254,7 +263,7 @@ class BlockLayout:
         normal_metrics = []
         super_metrics = []
 
-        for rel_x, word, font, is_superscript in self.line:
+        for rel_x, word, font, is_superscript, color in self.line:
             metrics = font.metrics()
             if is_superscript:
                 super_metrics.append(metrics)
@@ -276,7 +285,7 @@ class BlockLayout:
             line_width = 0
             if self.line:
                 first_rel_x = self.line[0][0]
-                last_rel_x, last_word, last_font, _ = self.line[-1]
+                last_rel_x, last_word, last_font, _, color = self.line[-1]
                 last_word_width = last_font.measure(last_word)
                 line_width = (last_rel_x + last_word_width) - first_rel_x
 
@@ -285,17 +294,17 @@ class BlockLayout:
             center_offset = (available_width - line_width) // 2
 
             # adjust x positions for centering
-            for i, (rel_x, word, font, is_superscript) in enumerate(self.line):
+            for i, (rel_x, word, font, is_superscript, color) in enumerate(self.line):
                 centered_rel_x = center_offset + HSTEP + (rel_x - HSTEP)
                 centered_abs_x = self.x + centered_rel_x
                 abs_y = self.y + self._calculate_word_y(baseline, font, is_superscript, normal_metrics)
-                self.display_list.append((centered_abs_x, abs_y, word, font))
+                self.display_list.append((centered_abs_x, abs_y, word, font, color))
         else:
             # now place each word relative to that line and add it to the display list
-            for rel_x, word, font, is_superscript in self.line:
+            for rel_x, word, font, is_superscript, color in self.line:
                 abs_x = self.x + rel_x
                 abs_y = self.y + self._calculate_word_y(baseline, font, is_superscript, normal_metrics)
-                self.display_list.append((abs_x, abs_y, word, font))
+                self.display_list.append((abs_x, abs_y, word, font, color))
         
         all_metrics = normal_metrics + super_metrics
         if all_metrics:
@@ -343,8 +352,8 @@ class BlockLayout:
         #     cmnds.append(rect)
 
         if self.layout_mode() == "inline":
-            for x, y, word, font in self.display_list:
-                cmnds.append(DrawText(x, y, word, font))
+            for x, y, word, font, color in self.display_list:
+                cmnds.append(DrawText(x, y, word, font, color))
         
 
         return cmnds
