@@ -11,3 +11,10 @@ BLOCK_ELEMENTS = [
     "figcaption", "main", "div", "table", "form", "fieldset",
     "legend", "details", "summary"
 ]
+
+INHERITED_PROPERTIES = {
+    "font-size": "16px", # defaults included
+    "font-style": "normal",
+    "font-weight": "normal",
+    "color": "black"
+}
