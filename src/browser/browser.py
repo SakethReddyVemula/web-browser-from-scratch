@@ -7,7 +7,7 @@ from layout_tree import DocumentLayout, Element # Use tree based layout instead 
 # from lexer import lex
 from parser import HTMLParser, print_tree
 from css_parser import style, CSSParser
-from utils import tree_to_list
+from utils import tree_to_list, cascade_priority
 
 # default user-agent style sheet
 DEFAULT_STYLE_SHEET = CSSParser(open("user_agent.css").read()).parse()
@@ -58,8 +58,7 @@ class Browser:
 
         # apply default (from user-agent) style sheets
         rules = DEFAULT_STYLE_SHEET.copy()
-        style(self.nodes, rules)
-
+        style(self.nodes, sorted(rules, key=cascade_priority)) # cascading, file-order acts as tie-breaker (as required) (python sorted works like that)
         
         links = []
 

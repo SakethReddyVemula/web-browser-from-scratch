@@ -6,6 +6,7 @@ from layout_tree import Element
 class TagSelector:
     def __init__(self, tag):
         self.tag = tag
+        self.priority = 1
 
     def matches(self, node):
         return isinstance(node, Element) and self.tag == node.tag
@@ -16,6 +17,7 @@ class DescendantSelector:
     def __init__(self, ancestor, descendant):
         self.ancestor = ancestor
         self.descendant = descendant
+        self.priority = ancestor.priority + descendant.priority # more specific rules to override more general ones
 
     def matches(self, node):
         if not self.descendant.matches(node):

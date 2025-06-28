@@ -41,3 +41,8 @@ def tree_to_list(tree, list):
         tree_to_list(child, list)
 
     return list
+
+
+def cascade_priority(rule):
+    selector, body = rule
+    return selector.priority
