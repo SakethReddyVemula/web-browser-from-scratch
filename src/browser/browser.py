@@ -3,10 +3,11 @@ import tkinter
 from constants import WIDTH, HEIGHT, VSTEP, SCROLL_STEP
 # from layout import Layout
 # from layout_tree_simple import Layout # Use tree based layout instead of normal lexer based
-from layout_tree import DocumentLayout # Use tree based layout instead of normal lexer based
+from layout_tree import DocumentLayout, Element # Use tree based layout instead of normal lexer based
 # from lexer import lex
 from parser import HTMLParser, print_tree
 from css_parser import style, CSSParser
+from utils import tree_to_list
 
 # default user-agent style sheet
 DEFAULT_STYLE_SHEET = CSSParser(open("user_agent.css").read()).parse()
@@ -59,6 +60,23 @@ class Browser:
         rules = DEFAULT_STYLE_SHEET.copy()
         style(self.nodes, rules)
 
+        
+        links = []
+
+        # parsing <link rel="stylesheet" href="/main.css"> ...
+        for node in tree_to_list(self.nodes, []):
+            if isinstance(node, Element) and node.tag == "link" and node.attributes.get("rel") == "stylesheet" and "href" in node.attributes:
+                links.append(node.attributes["href"])
+
+        for link in links:
+            style_url = url.resolve(link)
+            try:
+                body = style_url.request()
+            except:        
+                continue
+            rules.extend(CSSParser(body).parse())
+
+        
         self.document = DocumentLayout(self.nodes) # constructing layout objects
         self.document.layout() # actually laying out "layout objects" earlier constructed
         # print_tree(self.document.node)

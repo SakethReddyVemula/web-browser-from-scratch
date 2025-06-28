@@ -255,3 +255,29 @@ class URL:
                 print("Warning: Expected CRLF after chunk data")
         
         return body
+    
+
+    def resolve(self, url):
+        # schema relative URL that starts with "//" followed by a full URL, which use the existing schema
+        # https://cdn.example.com/style.css (example)
+        if "://" in url:
+            return URL(url)
+        
+        # path-relative URL, doesn't start with a slash and is resolved like a file name would be
+        # url = "styles/main.css"
+        if not url.startswith("/"):
+            dir, _ = self.path.rsplit("/", 1)
+            while url.startswith("../"): # to resolve parent directory
+                _, url = url.split("/", 1)
+                if "/" in dir:
+                    dir, _ = dir.rsplit("/", 1)
+            url = dir + "/" + url
+
+        # url = "//static.example.com/style.css" (example)
+        if url.startswith("//"):
+            return URL(self.schema + ":" + url)
+        else:
+            # url = "/styles/main.css"
+            return URL(self.schema + "://" + self.host + ":" + str(self.port) + url)
+        
+    

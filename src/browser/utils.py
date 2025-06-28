@@ -28,3 +28,16 @@ def load(url):
     else:
         # other than view-source schema
         show(body)
+
+
+# Helper Functions
+
+
+def tree_to_list(tree, list):
+    """Turns a tree of nodes into a list of nodes. Works on both HTML and Layout Trees."""
+    list.append(tree)
+    
+    for child in tree.children:
+        tree_to_list(child, list)
+
+    return list
