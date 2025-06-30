@@ -3,7 +3,7 @@ import tkinter
 from constants import WIDTH, HEIGHT, VSTEP, SCROLL_STEP
 # from layout import Layout
 # from layout_tree_simple import Layout # Use tree based layout instead of normal lexer based
-from layout_tree import DocumentLayout, Element # Use tree based layout instead of normal lexer based
+from layout_tree import DocumentLayout, Element, Text # Use tree based layout instead of normal lexer based
 # from lexer import lex
 from parser import HTMLParser, print_tree
 from css_parser import style, CSSParser
@@ -38,6 +38,11 @@ class Browser:
         self.window.bind("<Down>", self.scrolldown)
         self.window.bind("<Up>", self.scrollup)
 
+        # click handling
+        self.url = None # for storing the current page's URL
+
+        self.window.bind("<Button-1>", self.click)
+
 
     # load and draw the text, character by character
     def load(self, url):
@@ -51,7 +56,7 @@ class Browser:
         #     text = lex(body)
         # self.display_list = Layout(text).display_list
         # self.draw()
-
+        self.url = url
         body = url.request()
         self.nodes = HTMLParser(body).parse()
         # self.display_list = Layout(self.nodes).display_list
@@ -116,3 +121,30 @@ class Browser:
         self.scroll -= SCROLL_STEP
         self.scroll = max((-1) * VSTEP, self.scroll - SCROLL_STEP)
         self.draw()
+
+    
+    def click(self, e):
+        x, y = e.x, e.y
+        y += self.scroll 
+
+        objs = []
+        for obj in tree_to_list(self.document, []):
+            if obj.x <= x < obj.x + obj.width and obj.y <= y < obj.y + obj.height:
+                objs.append(obj)
+
+        # clicked on empty space
+        if not objs:
+            return
+        
+        elt = objs[-1].node
+
+        while elt:
+            if isinstance(elt, Text):
+                pass
+            elif elt.tag == "a" and "href" in elt.attributes:
+                url = self.url.resolve(elt.attributes["href"])
+                self.scroll = 0 # set scroll of new page to 0
+                return self.load(url)
+            
+            elt = elt.parent
+        
