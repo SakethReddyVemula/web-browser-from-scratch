@@ -20,9 +20,12 @@ def paint_tree(layout_object, display_list):
     for child in layout_object.children:
         paint_tree(child, display_list)
 
-
+    
 class Browser:
     def __init__(self):
+        self.tabs = []
+        self.active_tab = None
+        
         self.window = tkinter.Tk()
         self.canvas = tkinter.Canvas(
             self.window, 
@@ -32,17 +35,46 @@ class Browser:
         )
         self.canvas.pack()
 
-        # field for tracking how far we have scrolled
-        self.scroll = 0
+        
         # bind the down arrow key to scroll
-        self.window.bind("<Down>", self.scrolldown)
-        self.window.bind("<Up>", self.scrollup)
+        self.window.bind("<Down>", self.handle_down)
+        self.window.bind("<Up>", self.handle_up)
 
+        self.window.bind("<Button-1>", self.handle_click)
+
+    def new_tab(self, url):
+        new_tab = Tab()
+        new_tab.load(url)
+        self.active_tab = new_tab
+        self.tabs.append(new_tab)
+        self.draw()
+    
+    def handle_down(self, e):
+        self.active_tab.scrolldown()
+        self.draw()
+
+    def handle_up(self, e):
+        self.active_tab.scrollup()
+        self.draw()
+
+    def handle_click(self, e):
+        self.active_tab.click(e.x, e.y)
+        self.draw()
+
+    def draw(self):
+        self.canvas.delete("all")
+        self.active_tab.draw(self.canvas)
+    
+
+
+
+class Tab:
+    def __init__(self):
         # click handling
         self.url = None # for storing the current page's URL
 
-        self.window.bind("<Button-1>", self.click)
-
+        # field for tracking how far we have scrolled
+        self.scroll = 0
 
     # load and draw the text, character by character
     def load(self, url):
@@ -91,11 +123,11 @@ class Browser:
         # print_tree(self.document.node)
         self.display_list = []
         paint_tree(self.document, self.display_list)
-        self.draw()
+        # self.draw()
 
     
-    def draw(self):
-        self.canvas.delete("all") # delete the old text before drawing new one, o/w it will lead to blackboxes eventually
+    def draw(self, canvas):
+        # self.canvas.delete("all") # delete the old text before drawing new one, o/w it will lead to blackboxes eventually
         # for x, y, c, font in self.display_list:
 
         #     # for fast rendering: skip drawing characters that are offscreen
@@ -108,23 +140,23 @@ class Browser:
                 continue
             if cmnd.bottom < self.scroll:
                 continue
-            cmnd.execute(self.scroll, self.canvas)
+            cmnd.execute(self.scroll, canvas)
 
 
 
-    def scrolldown(self, e):
+    def scrolldown(self):
         max_y = max(self.document.height + 2*VSTEP - HEIGHT, 0)
         self.scroll = min(self.scroll + SCROLL_STEP, max_y)
-        self.draw()
+        # self.draw()
 
-    def scrollup(self, e):
+
+    def scrollup(self):
         self.scroll -= SCROLL_STEP
         self.scroll = max((-1) * VSTEP, self.scroll - SCROLL_STEP)
-        self.draw()
+        # self.draw()
 
     
-    def click(self, e):
-        x, y = e.x, e.y
+    def click(self, x, y):
         y += self.scroll 
 
         objs = []

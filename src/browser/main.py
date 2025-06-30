@@ -20,5 +20,5 @@ if __name__ == "__main__":
         # nodes = HTMLParser(body).parse()
         # print_tree(nodes)
         body = URL(sys.argv[1])
-        Browser().load(body)
+        Browser().new_tab(body)
         tkinter.mainloop()
