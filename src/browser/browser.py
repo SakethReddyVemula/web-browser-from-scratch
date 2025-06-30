@@ -3,11 +3,12 @@ import tkinter
 from constants import WIDTH, HEIGHT, VSTEP, SCROLL_STEP
 # from layout import Layout
 # from layout_tree_simple import Layout # Use tree based layout instead of normal lexer based
-from layout_tree import DocumentLayout, Element, Text # Use tree based layout instead of normal lexer based
+from layout_tree import DocumentLayout, Element, Text, get_font, DrawText, DrawRect, Rect # Use tree based layout instead of normal lexer based
 # from lexer import lex
 from parser import HTMLParser, print_tree
 from css_parser import style, CSSParser
 from utils import tree_to_list, cascade_priority
+from url import URL
 
 # default user-agent style sheet
 DEFAULT_STYLE_SHEET = CSSParser(open("user_agent.css").read()).parse()
@@ -19,6 +20,134 @@ def paint_tree(layout_object, display_list):
 
     for child in layout_object.children:
         paint_tree(child, display_list)
+
+
+class DrawOutline:
+    def __init__(self, rect, color, thickness):
+        self.rect = rect
+        self.color = color
+        self.thickness = thickness
+
+    def execute(self, scroll, canvas):
+        canvas.create_rectangle(
+            self.rect.left,
+            self.rect.top - scroll,
+            self.rect.right,
+            self.rect.bottom - scroll,
+            width = self.thickness,
+            outline = self.color
+        )
+
+class DrawLine:
+    def __init__(self, x1, y1, x2, y2, color, thickness):
+        self.rect = Rect(x1, y1, x2, y2)
+        self.color = color
+        self.thickness = thickness
+
+    def execute(self, scroll, canvas):
+        canvas.create_line(
+            self.rect.left,
+            self.rect.top - scroll,
+            self.rect.right,
+            self.rect.bottom - scroll,
+            fill = self.color,
+            width = self.thickness
+        )
+
+
+class Chrome:
+    def __init__(self, browser):
+        self.browser = browser
+
+        self.font = get_font(15, "normal", "roman")
+        self.font_height = self.font.metrics("linespace")
+
+        self.padding = 5
+        self.tabbar_top = 0
+        self.tabbar_bottom = self.font_height + 2 * self.padding
+
+        plus_width = self.font.measure("+") + 2 * self.padding
+        self.newtab_rect = Rect(
+            self.padding,
+            self.padding,
+            self.padding + plus_width,
+            self.padding + self.font_height
+        )
+
+        self.bottom = self.tabbar_bottom
+
+    def tab_rect(self, i):
+        tabs_start = self.newtab_rect.right + self.padding
+        tab_width = self.font.measure("Tab X") + 2 * self.padding
+        return Rect(
+            tabs_start + tab_width * i,
+            self.tabbar_top,
+            tabs_start + tab_width * (i + 1),
+            self.tabbar_bottom
+        )
+    
+
+    def click(self, x, y):
+        if self.newtab_rect.contains_point(x, y):
+            self.browser.new_tab(URL("file://../test.html"))
+        else:
+            for i, tab in enumerate(self.browser.tabs):
+                if self.tab_rect(i).contains_point(x, y):
+                    self.browser.active_tab = tab
+                    break
+    
+
+    def paint(self):
+        cmnds = []
+
+        cmnds.append(DrawRect(
+            Rect(0, 0, WIDTH, self.bottom), "white"
+        ))
+        cmnds.append(DrawLine(
+            0, self.bottom, WIDTH, self.bottom, "black", 1
+        ))
+
+        cmnds.append(DrawOutline(self.newtab_rect, "black", 1))
+        cmnds.append(DrawText(
+            self.newtab_rect.left + self.padding,
+            self.newtab_rect.top,
+            "+",
+            self.font,
+            "black"
+        ))
+
+        for i, tab in enumerate(self.browser.tabs):
+            bounds = self.tab_rect(i)
+
+            cmnds.append(DrawLine(
+                bounds.left, 0, bounds.left, bounds.bottom, "black", 1
+            ))
+            cmnds.append(DrawLine(
+                bounds.right, 0, bounds.right, bounds.bottom, "black", 1
+            ))
+            cmnds.append(DrawText(
+                bounds.left + self.padding,
+                bounds.top + self.padding,
+                "Tab {}".format(i),
+                self.font,
+                "black"
+            ))
+
+            # to identify the active tab
+            if tab == self.browser.active_tab:
+                cmnds.append(DrawLine(
+                    0, bounds.bottom, bounds.left, bounds.bottom, "black", 1
+                ))
+
+                cmnds.append(DrawLine(
+                    bounds.right, bounds.bottom, WIDTH, bounds.bottom, "black", 1
+                ))
+
+        return cmnds
+
+
+
+    
 
     
 class Browser:
@@ -35,6 +164,7 @@ class Browser:
         )
         self.canvas.pack()
 
+        self.chrome = Chrome(self)
         
         # bind the down arrow key to scroll
         self.window.bind("<Down>", self.handle_down)
@@ -43,7 +173,7 @@ class Browser:
         self.window.bind("<Button-1>", self.handle_click)
 
     def new_tab(self, url):
-        new_tab = Tab()
+        new_tab = Tab(HEIGHT - self.chrome.bottom)
         new_tab.load(url)
         self.active_tab = new_tab
         self.tabs.append(new_tab)
@@ -58,23 +188,34 @@ class Browser:
         self.draw()
 
     def handle_click(self, e):
-        self.active_tab.click(e.x, e.y)
+        if e.y < self.chrome.bottom:
+            self.chrome.click(e.x, e.y)
+        else:
+            tab_y = e.y - self.chrome.bottom
+            self.active_tab.click(e.x, tab_y)
         self.draw()
 
     def draw(self):
         self.canvas.delete("all")
-        self.active_tab.draw(self.canvas)
+        self.active_tab.draw(self.canvas, self.chrome.bottom)
+
+        # draw the tabs after main content
+        for cmnd in self.chrome.paint():
+            cmnd.execute(0, self.canvas)
     
 
 
 
 class Tab:
-    def __init__(self):
+    def __init__(self, tab_height):
         # click handling
         self.url = None # for storing the current page's URL
 
         # field for tracking how far we have scrolled
         self.scroll = 0
+
+        # changes for accounting for tab
+        self.tab_height = tab_height # tab height means the height of the remaining window after the bar on top (and not the height of the "tab")
 
     # load and draw the text, character by character
     def load(self, url):
@@ -126,7 +267,7 @@ class Tab:
         # self.draw()
 
     
-    def draw(self, canvas):
+    def draw(self, canvas, offset):
         # self.canvas.delete("all") # delete the old text before drawing new one, o/w it will lead to blackboxes eventually
         # for x, y, c, font in self.display_list:
 
@@ -136,16 +277,16 @@ class Tab:
 
         #     self.canvas.create_text(x, y - self.scroll, text=c, anchor="nw", font=font) # anchor = "nw" -> tells tkinter that the coordinates are the top-left (northwest), and not the center as assumed in default
         for cmnd in self.display_list:
-            if cmnd.top > self.scroll + HEIGHT:
+            if cmnd.rect.top > self.scroll + self.tab_height:
                 continue
-            if cmnd.bottom < self.scroll:
+            if cmnd.rect.bottom < self.scroll:
                 continue
-            cmnd.execute(self.scroll, canvas)
+            cmnd.execute(self.scroll - offset, canvas)
 
 
 
     def scrolldown(self):
-        max_y = max(self.document.height + 2*VSTEP - HEIGHT, 0)
+        max_y = max(self.document.height + 2*VSTEP - self.tab_height, 0)
         self.scroll = min(self.scroll + SCROLL_STEP, max_y)
         # self.draw()
 

@@ -4,6 +4,16 @@ import tkinter.font
 from constants import WIDTH, HEIGHT, HSTEP, VSTEP, BLOCK_ELEMENTS
 from parser import Text, Element
 
+class Rect:
+    def __init__(self, left, top, right, bottom):
+        self.left = left
+        self.top = top
+        self.right = right
+        self.bottom = bottom
+
+    def contains_point(self, x, y):
+        return (x >= self.left and x < self.right and y >= self.top and y < self.bottom)
+
 FONTS = {}
 
 # font management system
@@ -45,36 +55,38 @@ class DocumentLayout:
     
 class DrawText:
     def __init__(self, x1, y1, text, font, color):
-        self.top = y1
-        self.left = x1
+        self.rect = Rect(
+            x1, 
+            y1,
+            x1 + font.measure(text), 
+            y1 + font.metrics("linespace")
+        )
         self.text = text
         self.font = font
         self.color = color
-        self.bottom = y1 + font.metrics("linespace")
 
     def execute(self, scroll, canvas):
         canvas.create_text(
-            self.left, self.top - scroll,
-            text = self.text,
-            font = self.font,
-            anchor = "nw",
-            fill = self.color
+            self.rect.left, self.rect.top - scroll,
+            text=self.text,
+            font=self.font,
+            anchor='nw',
+            fill=self.color
         )
 
 class DrawRect:
-    def __init__(self, x1, y1, x2, y2, color):
-        self.top = y1
-        self.left = x1
-        self.bottom = y2
-        self.right = x2
+    def __init__(self, rect, color):
+        self.rect = rect
         self.color = color
 
     def execute(self, scroll, canvas):
         canvas.create_rectangle(
-            self.left, self.top - scroll,
-            self.right, self.bottom - scroll,
-            width = 0,
-            fill = self.color
+            self.rect.left, 
+            self.rect.top - scroll,
+            self.rect.right, 
+            self.rect.bottom - scroll,
+            width=0,
+            fill=self.color
         )
 
 
@@ -402,7 +414,7 @@ class BlockLayout:
 
         if bgcolor != "transparent":
             x2, y2 = self.x + self.width, self.y + self.height
-            rect = DrawRect(self.x, self.y, x2, y2, bgcolor)
+            rect = DrawRect(Rect(self.x, self.y, x2, y2), bgcolor)
             cmnds.append(rect)
 
         return cmnds
