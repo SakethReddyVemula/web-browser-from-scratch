@@ -78,6 +78,148 @@ class DrawRect:
         )
 
 
+class LineLayout:
+    def __init__(self, node, parent, previous):
+        self.node = node
+        self.parent = parent
+        self.previous = previous
+        self.children = []
+
+    def layout(self):
+        self.width = self.parent.width
+        self.x = self.parent.x
+
+        if self.previous:
+            self.y = self.previous.y + self.previous.height
+        else:
+            self.y = self.parent.y
+
+        # First, layout all the words to get their dimensions
+        for word in self.children:
+            word.layout()
+        
+        # If no words in this line, set minimal height and return
+        if not self.children:
+            self.height = VSTEP
+            return
+        
+        # Separate metrics calculations for normal and superscript text
+        normal_metrics = []
+        super_metrics = []
+        
+        for word in self.children:
+            metrics = word.font.metrics()
+            if hasattr(word, 'is_superscript') and word.is_superscript:
+                super_metrics.append(metrics)
+            else:
+                normal_metrics.append(metrics)
+        
+        # Calculate baseline based on normal text (if any)
+        if normal_metrics:
+            max_normal_ascent = max([metric["ascent"] for metric in normal_metrics])
+            baseline_offset = 1.25 * max_normal_ascent
+        else:
+            # If only superscript text on this line, use superscript metrics
+            max_super_ascent = max([metric["ascent"] for metric in super_metrics]) if super_metrics else 0
+            baseline_offset = 1.25 * max_super_ascent
+        
+        # Set baseline relative to line's y position
+        baseline = self.y + baseline_offset
+        
+        # Handle center alignment
+        if self.align == "center":
+            # Calculate total width of all words plus spaces between them
+            total_content_width = 0
+            for i, word in enumerate(self.children):
+                total_content_width += word.width
+                if i < len(self.children) - 1:  # Add space width except for last word
+                    total_content_width += word.font.measure(" ")
+            
+            # Calculate starting x position to center the content
+            available_width = self.width
+            center_start_x = self.x + (available_width - total_content_width) // 2
+            
+            # Reposition all words for centering
+            current_x = center_start_x
+            for word in self.children:
+                word.x = current_x
+                current_x += word.width + word.font.measure(" ")
+        
+        # Position each word vertically based on baseline
+        for word in self.children:
+            is_super = hasattr(word, 'is_superscript') and word.is_superscript
+            word.y = self._calculate_word_y(baseline, word.font, is_super, normal_metrics)
+        
+        # Calculate line height
+        all_metrics = normal_metrics + super_metrics
+        if all_metrics:
+            max_descent = max([metric["descent"] for metric in all_metrics])
+            self.height = int(baseline_offset + 1.25 * max_descent)
+        else:
+            self.height = VSTEP
+
+    def _calculate_word_y(self, baseline, font, is_super, normal_metrics):
+        """Calculate y position for a word, handling superscript positioning"""
+        if is_super and normal_metrics:
+            # Superscript: align top of superscript with top of normal letters
+            normal_ascent = max([metric["ascent"] for metric in normal_metrics])
+            super_ascent = font.metrics()["ascent"]
+            
+            # Position so superscript top aligns with normal text top
+            normal_top = baseline - normal_ascent
+            super_baseline = normal_top + super_ascent
+            return int(super_baseline - super_ascent)
+        else:
+            # Normal text positioning
+            return int(baseline - font.metrics()["ascent"])
+
+    def paint(self):
+        return []
+    
+
+
+class TextLayout:
+    def __init__(self, node, word, parent, previous):
+        self.node = node
+        self.word = word
+        self.parent = parent
+        self.previous = previous
+        self.children = []
+
+        self.is_superscript = getattr(parent.parent, "superscript", False)
+
+    def layout(self):
+        weight = self.node.style["font-weight"]
+        style = self.node.style["font-style"]
+        if style == "normal": 
+            style = "roman"
+        
+        # Get base size and apply superscript scaling if needed
+        base_size = int(float(self.node.style["font-size"][:-2]) * .75)
+        if self.is_superscript:
+            size = max(8, int(base_size * 0.6))  # 60% of normal size, minimum 8px
+        else:
+            size = base_size
+            
+        self.font = get_font(size, weight, style)
+
+        self.width = self.font.measure(self.word)
+
+        # Set initial x position (will be adjusted for centering in LineLayout)
+        if self.previous:
+            space = self.previous.font.measure(" ")
+            self.x = self.previous.x + space + self.previous.width
+        else:
+            self.x = self.parent.x
+
+        self.height = self.font.metrics("linespace")
+        
+    def paint(self):
+        color = self.node.style["color"]
+        return [DrawText(self.x, self.parent.y, self.word, self.font, color)]
+    
+
+
 class BlockLayout:
     def __init__(self, node, parent, previous):
         self.node = node
@@ -91,7 +233,7 @@ class BlockLayout:
         self.width = None
         self.height = None
 
-        self.display_list = []
+        # self.display_list = []
 
     def layout_intermediate(self):
         # this code constructs the layout tree from the HTML tree, so it reads from node.children (in the HTML tree) and writes to self.children (in the layout tree)
@@ -142,8 +284,6 @@ class BlockLayout:
             self.style = "roman"
             self.size = 12
 
-            self.line = [] # to store line-to-be
-
             # alignment tracking
             self.align = "left" # can be "left", "center", or "right"
             self.in_title_h1 = False # track if we are inside <h1 class="title">
@@ -152,21 +292,14 @@ class BlockLayout:
             self.superscript = False # track if we are inside <sup> superscript mode
 
             # Process the tree recursively
+            self.newline()
             self.recurse(self.node)
-            self.flush()
 
         
         for child in self.children:
             child.layout()
 
-
-        # element's height field depends on the children's height, so must be computed after the layout call of childrens
-        if mode == "block":
-            self.height = sum([child.height for child in self.children])
-        else:
-            self.height = self.cursor_y # if it is normal text, all the text must be insider, right...
-
-
+        self.height = sum([child.height for child in self.children])
         
 
 
@@ -195,112 +328,54 @@ class BlockLayout:
             if attributes.get("class") == "title":
                 self.in_title_h1 = True
                 self.align = "center"
-                self.flush() # start fresh line for h1
+                self.newline() # start fresh line for h1
         elif tag == "sup":
             self.superscript = True
         elif tag == "br":
-            self.flush()
+            self.newline()
 
     def close_tag(self, tag):
         """Handle closing HTML tags"""
         if tag == "h1":
             if self.in_title_h1 == True:
-                self.flush() # finish current line
+                self.newline() # finish current line
                 self.in_title_h1 = False 
                 self.align = "left" # reset to left alignment
                 self.cursor_y += VSTEP # add some spacing after h1
         elif tag == "sup":
             self.superscript = False
         elif tag == "p":
-            self.flush()
+            self.newline()
             self.cursor_y += VSTEP
 
     def word(self, node, word):
         weight = node.style["font-weight"]
         style = node.style["font-style"]
-        # translate CSS's normal to tkinter "roman"
         if style == "normal":
             style = "roman"
-        curr_size = int(float(node.style["font-size"][:-2]) * 0.75) # convert CSS's pixels to Tkinter points
+        curr_size = int(float(node.style["font-size"][:-2]) * 0.75)
 
-        # calculate word size based on superscript state
-        if self.superscript == True:
-            curr_size = max(8, int(curr_size * 0.6)) # 60% of normal size, minimum 8px
-
+        # Use the original size for width calculation (superscript scaling handled in TextLayout)
         font = get_font(curr_size, weight, style)
         
-        w = font.measure(word) # width taken by that word
+        w = font.measure(word)
         if self.cursor_x + w > self.width:
-            self.flush()
+            self.newline()
 
-        # store superscript flag with each word for positioning
-        color = node.style["color"]
-        self.line.append((self.cursor_x, word, font, self.superscript, color))
+        line = self.children[-1] # get the current line
+        previous_word = line.children[-1] if line.children else None
+        text = TextLayout(node, word, line, previous_word)
+        line.children.append(text)
+
         self.cursor_x += w + font.measure(" ")
 
 
-    def flush(self):
-        if not self.line:
-            return
-        
-        # separate metrics calculations for normal and superscript text
-        normal_metrics = []
-        super_metrics = []
-
-        for rel_x, word, font, is_superscript, color in self.line:
-            metrics = font.metrics()
-            if is_superscript:
-                super_metrics.append(metrics)
-            else:
-                normal_metrics.append(metrics)
-            
-        # calculate baseline based on normal text (if any)
-        if normal_metrics:
-            max_normal_ascent = max([metric["ascent"] for metric in normal_metrics])
-            baseline = self.cursor_y + 1.25 * max_normal_ascent
-        else:
-            # if only superscript text on this line use superscript metrics
-            max_super_ascent = max([metric["ascent"] for metric in super_metrics]) if super_metrics else 0
-            baseline = self.cursor_y + 1.25 * max_super_ascent
-
-        # calculate line width for centering
-        if self.align == "center":
-            # calculate total width of the line
-            line_width = 0
-            if self.line:
-                first_rel_x = self.line[0][0]
-                last_rel_x, last_word, last_font, _, color = self.line[-1]
-                last_word_width = last_font.measure(last_word)
-                line_width = (last_rel_x + last_word_width) - first_rel_x
-
-            # calculate offset to center the line
-            available_width = WIDTH - 2 * HSTEP
-            center_offset = (available_width - line_width) // 2
-
-            # adjust x positions for centering
-            for i, (rel_x, word, font, is_superscript, color) in enumerate(self.line):
-                centered_rel_x = center_offset + HSTEP + (rel_x - HSTEP)
-                centered_abs_x = self.x + centered_rel_x
-                abs_y = self.y + self._calculate_word_y(baseline, font, is_superscript, normal_metrics)
-                self.display_list.append((centered_abs_x, abs_y, word, font, color))
-        else:
-            # now place each word relative to that line and add it to the display list
-            for rel_x, word, font, is_superscript, color in self.line:
-                abs_x = self.x + rel_x
-                abs_y = self.y + self._calculate_word_y(baseline, font, is_superscript, normal_metrics)
-                self.display_list.append((abs_x, abs_y, word, font, color))
-        
-        all_metrics = normal_metrics + super_metrics
-        if all_metrics:
-            max_descent = max([metric["descent"] for metric in all_metrics])
-            self.cursor_y = baseline + 1.25 * max_descent
-        else:
-            self.cursor_y += VSTEP
-
-        # update Layout's cursor_x and self.line
-        self.cursor_x = 0 # 0 instead of HSTEP, since relative to the block's x and y
-        self.line = []
-
+    def newline(self):
+        self.cursor_x = 0
+        last_line = self.children[-1] if self.children else None
+        new_line = LineLayout(self.node, self, last_line)
+        new_line.align = self.align
+        self.children.append(new_line)
 
 
     def _calculate_word_y(self, baseline, font, is_super, normal_metrics):
@@ -329,15 +404,5 @@ class BlockLayout:
             x2, y2 = self.x + self.width, self.y + self.height
             rect = DrawRect(self.x, self.y, x2, y2, bgcolor)
             cmnds.append(rect)
-
-        # if isinstance(self.node, Element) and self.node.tag == "pre":
-        #     x2, y2 = self.x + self.width, self.y + self.height
-        #     rect = DrawRect(self.x, self.y, x2, y2, "gray")
-        #     cmnds.append(rect)
-
-        if self.layout_mode() == "inline":
-            for x, y, word, font, color in self.display_list:
-                cmnds.append(DrawText(x, y, word, font, color))
-        
 
         return cmnds
