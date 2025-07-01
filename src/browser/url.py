@@ -280,4 +280,11 @@ class URL:
             # url = "/styles/main.css"
             return URL(self.schema + "://" + self.host + ":" + str(self.port) + url)
         
+    def __str__(self):
+        port_part = ":" + str(self.port)
+        if self.schema == "https" and self.port == 443:
+            port_part = ""
+        if self.schema == "http" and self.port == 80:
+            port_part = ""
+        return self.schema + "://" + self.host + port_part + self.path
     

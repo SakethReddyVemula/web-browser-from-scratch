@@ -3,6 +3,7 @@ import tkinter
 import tkinter.font
 from constants import WIDTH, HEIGHT, HSTEP, VSTEP, BLOCK_ELEMENTS
 from parser import Text, Element
+from utils import parse_font_size
 
 class Rect:
     def __init__(self, left, top, right, bottom):
@@ -67,7 +68,8 @@ class DrawText:
 
     def execute(self, scroll, canvas):
         canvas.create_text(
-            self.rect.left, self.rect.top - scroll,
+            self.rect.left, 
+            self.rect.top - scroll,
             text=self.text,
             font=self.font,
             anchor='nw',
@@ -207,7 +209,9 @@ class TextLayout:
             style = "roman"
         
         # Get base size and apply superscript scaling if needed
-        base_size = int(float(self.node.style["font-size"][:-2]) * .75)
+        font_size_px = parse_font_size(self.node.style["font-size"])
+        base_size = int(font_size_px * 0.75)
+
         if self.is_superscript:
             size = max(8, int(base_size * 0.6))  # 60% of normal size, minimum 8px
         else:
@@ -365,7 +369,9 @@ class BlockLayout:
         style = node.style["font-style"]
         if style == "normal":
             style = "roman"
-        curr_size = int(float(node.style["font-size"][:-2]) * 0.75)
+
+        font_size_px = parse_font_size(node.style["font-size"])
+        curr_size = int(font_size_px * 0.75)
 
         # Use the original size for width calculation (superscript scaling handled in TextLayout)
         font = get_font(curr_size, weight, style)
