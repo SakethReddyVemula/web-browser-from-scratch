@@ -281,10 +281,24 @@ class URL:
             return URL(self.schema + "://" + self.host + ":" + str(self.port) + url)
         
     def __str__(self):
+        # Handle view-source URLs
+        if self.schema == "view-source":
+            return f"view-source:{self.inner_url}"
+        
+        # Handle data URLs
+        if self.schema == "data":
+            return f"data:{self.media_info},{urllib.parse.quote(self.data_content)}"
+        
+        # Handle file URLs
+        if self.schema == "file":
+            return f"file://{self.path}"
+        
+        # Handle HTTP and HTTPS URLs
         port_part = ":" + str(self.port)
         if self.schema == "https" and self.port == 443:
             port_part = ""
         if self.schema == "http" and self.port == 80:
             port_part = ""
+        
         return self.schema + "://" + self.host + port_part + self.path
     
